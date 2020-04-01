@@ -13,6 +13,14 @@ char = pygame.image.load('standing.png')
 
 clock = pygame.time.Clock()
 
+#bulletSound = pygame.mixer.Sound("bullet.wav") #nebija pieejami šie skaņas efekti, tādēļ nav ievietoti mapē
+#hitSound = pygame.mixer.Sound("Hit.wav")
+
+music = pygame.mixer.music.load("music.mp3")
+pygame.mixer.music.play(-1)
+
+score = 0
+
 # objekta dimensiju vertibas un atrums cik atri parvietojas un x un y ir vieta,
 # kur parādās ielādējot
 class player(object):
@@ -46,7 +54,26 @@ class player(object):
             else:
                 win.blit(walkLeft[0], (self.x, self.y))
         self.hitbox = (self.x + 17, self.y, 29, 62)
-        pygame.draw.rect(win, (255, 0, 0), self.hitbox, 2)
+        #pygame.draw.rect(win, (255, 0, 0), self.hitbox, 2) #uzzīmē kasti ap čaru
+
+    def hit(self):
+        self.isJump = False
+        self.jumpCount = 10
+        self.x = 60
+        self.y = 410
+        self.walkCount = 0
+        font1 = pygame.font.SysFont("comicsans", 100)
+        text = font1.render("-5", 1, (255, 0, 0))
+        win.blit(text, ((852/2)-(text.get_width()/2), ((480/2)-(text.get_height()/2))))
+        pygame.display.update()
+        i = 0
+        while i < 100:
+            pygame.time.delay(10)
+            i += 1
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: #ievietots, lai kamēr ir pauze var iziet no spēles
+                    i = 301
+                    pygame.QUIT
 
 
 class Projectile(object):
@@ -82,19 +109,25 @@ class enemy(object):
         self.walkCount = 0
         self.vel = 3
         self.hitbox = (self.x + 17, self.y + 2, 31, 57)
+        self.health = 10
+        self.visible = True
 
     def draw(self, win):
         self.move()
-        if self.walkCount + 1 >= 33:
-            self.walkCount = 0
-        if self.vel > 0:
-            win.blit(self.walkRight[self.walkCount //3], (self.x, self.y))
-            self.walkCount += 1
-        else:
-            win.blit(self.walkLeft[self.walkCount // 3], (self.x, self.y))
-            self.walkCount += 1
-        self.hitbox = (self.x + 17, self.y + 2, 31, 57)
-        pygame.draw.rect(win, (255,0,0), self.hitbox, 2)
+        if self.visible:
+            if self.walkCount + 1 >= 33:
+                self.walkCount = 0
+            if self.vel > 0:
+                win.blit(self.walkRight[self.walkCount //3], (self.x, self.y))
+                self.walkCount += 1
+            else:
+                win.blit(self.walkLeft[self.walkCount // 3], (self.x, self.y))
+                self.walkCount += 1
+            self.hitbox = (self.x + 17, self.y + 2, 31, 57)
+
+            pygame.draw.rect(win, (255, 0, 0), (self.hitbox[0], self.hitbox[1] - 20, 50, 10))
+            pygame.draw.rect(win, (0, 128, 0), (self.hitbox[0], self.hitbox[1] - 20, 50 - (5 * (10 - self.health)), 10)) # katru reizi kā trāpa šis samazinās atklājot sarkano krāsu, kas ir apakšā
+            #pygame.draw.rect(win, (255,0,0), self.hitbox, 2) #uzzīmē kasti ap čaru
 
     def move(self):
         if self.vel > 0:
@@ -111,15 +144,21 @@ class enemy(object):
                 self.walkCount = 0
 
     def hit(self):
+        if self.health >0:
+            self.health -= 1
+        else:
+            self.visible = False
         print("hit")
 
 
 # bekgrounda funkcija
 def redrawGameWindow():
     #global walkCount #šis, laikam, atļauj izmainot mainīgo te, izmainīt arī to ārpus funkcijas
-    # lai objekts sglabātu formu un neveidotos š'vīka, kur bijis objekts ar fill aizpilda vietu,
+    # lai objekts sglabātu formu un neveidotos švīka, kur bijis objekts ar fill aizpilda vietu,
     # kur tikko bija objekts
     win.blit(bg, (0, 0)) #nomaina bekgroundu uz attēlu, ne kā win.fill((0, 0, 0)) kas iedod tikai krāsu
+    text = font.render("Score: " + str(score), 1, (0,0,0)) #izveido tekstu
+    win.blit(text, (740, 10)) # uzzīmē tekstu uz ekrāna
     man.draw(win)
     goblin.draw(win)
     for bullet in bullets:
@@ -131,6 +170,7 @@ def redrawGameWindow():
 
 # loops, kas nosaka visu spēli
 #mainloop
+font = pygame.font.SysFont("comicsans", 30, True, True)
 man = player(300, 410, 64, 64)
 goblin = enemy(100, 410, 64, 64, 450)
 shootloop = 0
@@ -139,20 +179,30 @@ run = True
 while run:
     #pygame.time.delay(27) # ekrāna pārlādēšanās ātrums, ietekmē cik ātri objekti pārvietosies
     clock.tick(27) #attēla atjaunošana (fps)
+
+    if goblin.visible == True:
+        if man.hitbox[1] < goblin.hitbox[1] + goblin.hitbox[3] and man.hitbox[1] + man.hitbox[3] > goblin.hitbox[1]:
+            if man.hitbox[0] + man.hitbox[2] > goblin.hitbox[0] and man.hitbox[0] < goblin.hitbox[0] + goblin.hitbox[2]:
+                man.hit()
+                score -= 5
     if shootloop > 0:
         shootloop += 1
     if shootloop > 3:
         shootloop = 0
+
     # uzspiežot krustiņu iziet no spēles
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             run = False
 
     for bullet in bullets:
-        if bullet.y - bullet.radius < goblin.hitbox[1] + goblin.hitbox[3] and bullet.y + bullet.radius > goblin.hitbox[1]:
-            if bullet.x + bullet.radius > goblin.hitbox[0] and bullet.x - bullet.radius < goblin.hitbox[0] + goblin.hitbox[2]:
-                goblin.hit()
-                bullets.pop(bullets.index(bullet))
+        if goblin.visible == True:
+            if bullet.y - bullet.radius < goblin.hitbox[1] + goblin.hitbox[3] and bullet.y + bullet.radius > goblin.hitbox[1]:
+                if bullet.x + bullet.radius > goblin.hitbox[0] and bullet.x - bullet.radius < goblin.hitbox[0] + goblin.hitbox[2]:
+                    #hitSound.play() # ja būtu ielādēta skaņa, tad te to liktu, kad trāpa goblinam
+                    goblin.hit()
+                    bullets.pop(bullets.index(bullet))
+                    score +=1
         if bullet.x < 852 and bullet.x > 0:
             bullet.x += bullet.vel
         else:
@@ -162,6 +212,7 @@ while run:
     keys = pygame.key.get_pressed()
 
     if keys[pygame.K_SPACE] and  shootloop == 0:
+        #bullet.Sound.play() #ja būtu ielādēts skaņas fails, tad šādi šo palaistu uz lodes izšaušanu
         if man.left:
             facing = -1
         else:
